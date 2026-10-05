@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rifly 🎟️</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <!-- Header fixo -->
+    <header class="header">
+        <div class="logo">🎟️ Rifly</div>
+    </header>
+
+    <!-- Indicador de Carregamento -->
+    <div id="loading" class="center-box">
+        <div class="spinner"></div>
+        <p>Carregando rifa...</p>
+    </div>
+
+    <!-- Tela de Erro -->
+    <div id="error" class="center-box hidden">
+        <div class="error-icon">😕</div>
+        <p id="error-message">Rifa não encontrada ou desativada.</p>
+    </div>
+
+    <!-- Conteúdo da Rifa -->
+    <main id="raffle-content" class="hidden">
+
+        <!-- Banner de Sorteio Realizado -->
+        <div id="drawn-banner" class="hidden">
+            <h2>🏆 SORTEIO REALIZADO!</h2>
+            <p id="drawn-info"></p>
+        </div>
+
+        <!-- Card Hero do Prêmio -->
+        <section class="card-hero">
+            <img id="raffle-image" class="hidden" alt="Imagem do Prêmio">
+            <h1 id="raffle-title"></h1>
+            <p id="raffle-prize" class="badge-prize"></p>
+            <p id="raffle-price" class="price-highlight"></p>
+
+            <div id="raffle-stats">
+                <div class="stats-header">
+                    <span id="stats-counter">0 de 0 vendidos</span>
+                    <span id="stats-percentage">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+            </div>
+
+            <p id="raffle-description" class="description"></p>
+        </section>
+
+        <!-- Grade de Escolha dos Números -->
+        <section class="card-grid">
+            <h2>Escolha seus números</h2>
+
+            <div class="legend">
+                <div class="legend-item"><span class="dot available"></span> Disponível</div>
+                <div class="legend-item"><span class="dot selected"></span> Selecionado</div>
+                <div class="legend-item"><span class="dot reserved"></span> Reservado</div>
+                <div class="legend-item"><span class="dot sold"></span> Vendido</div>
+            </div>
+
+            <div id="number-grid"></div>
+        </section>
+
+        <!-- Barra Inferior de Compra (Fixa) -->
+        <div id="bottom-bar" class="hidden">
+            <div id="selected-chips"></div>
+            <div class="bar-footer">
+                <div class="total-info">
+                    <span class="total-label">Total:</span>
+                    <span id="total-value">R$ 0,00</span>
+                </div>
+                <button id="btn-buy">Comprar</button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal de Formulário -->
+    <div id="modal-form" class="modal hidden">
+        <div class="modal-content">
+            <h2>Quase lá!</h2>
+            <p class="modal-sub">Informe seus dados para reservar os números escolhidos.</p>
+
+            <input type="text" id="buyer-name" placeholder="Seu nome completo" autocomplete="name">
+            <input type="tel" id="buyer-phone" placeholder="Seu WhatsApp (11) 99999-9999" autocomplete="tel">
+
+            <p id="form-error" class="error-text hidden"></p>
+
+            <button id="btn-confirm" class="btn-primary">Confirmar reserva</button>
+            <button id="btn-cancel-form" class="btn-text">Voltar</button>
+        </div>
+    </div>
+
+    <!-- Modal de Sucesso -->
+    <div id="modal-success" class="modal hidden">
+        <div class="modal-content text-center">
+            <div class="success-icon">✅</div>
+            <h2>Reserva realizada!</h2>
+            <p id="success-numbers" class="numbers-highlight"></p>
+
+            <div class="pix-box">
+                <label>Chave Pix para pagamento</label>
+                <div id="pix-key"></div>
+                <button id="btn-copy">📋 Copiar chave</button>
+            </div>
+
+            <p id="pix-value" class="pix-amount"></p>
+            <p class="instruction">Faça o Pix e envie o comprovante no WhatsApp do criador para confirmar seus números.</p>
+
+            <a id="btn-whatsapp-creator" class="btn-whatsapp" target="_blank" rel="noopener noreferrer">
+                💬 Enviar comprovante no WhatsApp
+            </a>
+
+            <p class="small-text">Seus números ficam reservados aguardando confirmação.</p>
+        </div>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,497 @@
+:root {
+    --green: #10B981;
+    --green-dark: #059669;
+    --orange: #F59E0B;
+    --red: #EF4444;
+    --gray-bg: #F9FAFB;
+    --text: #1F2937;
+    --card-bg: #FFFFFF;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--gray-bg);
+    color: var(--text);
+    padding-bottom: 110px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Header */
+.header {
+    position: sticky;
+    top: 0;
+    background: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    padding: 14px 16px;
+    text-align: center;
+    z-index: 40;
+}
+
+.logo {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text);
+}
+
+/* Container de Loading & Erro */
+.center-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 24px;
+    text-align: center;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #E5E7EB;
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.error-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+/* Cards */
+.card-hero, .card-grid {
+    background: var(--card-bg);
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin: 12px;
+    padding: 16px;
+}
+
+#raffle-image {
+    width: 100%;
+    max-height: 260px;
+    object-fit: cover;
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+
+#raffle-title {
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    line-height: 1.3;
+}
+
+.badge-prize {
+    display: inline-block;
+    background: #ECFDF5;
+    color: var(--green-dark);
+    font-weight: 700;
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.price-highlight {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--green-dark);
+    margin-bottom: 16px;
+}
+
+/* Progresso */
+#raffle-stats {
+    margin-bottom: 12px;
+}
+
+.stats-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 600;
+    color: #4B5563;
+    margin-bottom: 6px;
+}
+
+.progress-bar {
+    background: #E5E7EB;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    background: var(--green);
+    height: 100%;
+    width: 0%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.description {
+    font-size: 14px;
+    color: #4B5563;
+    line-height: 1.5;
+}
+
+/* Banner Sorteado */
+#drawn-banner {
+    background: #D1FAE5;
+    border: 1px solid var(--green);
+    color: #065F46;
+    border-radius: 16px;
+    padding: 16px;
+    margin: 12px;
+    text-align: center;
+}
+
+#drawn-banner h2 {
+    font-size: 18px;
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+
+#drawn-info {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* Grade de Números */
+.card-grid h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 12px;
+    color: #4B5563;
+    margin-bottom: 16px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.dot.available { background: #E5E7EB; }
+.dot.selected { background: var(--green); }
+.dot.reserved { background: var(--orange); }
+.dot.sold { background: #9CA3AF; }
+
+#number-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+    gap: 8px;
+}
+
+.num-btn {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: none;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.num-btn.available {
+    background: #E5E7EB;
+    color: #374151;
+}
+
+.num-btn.available:active {
+    transform: scale(1.08);
+}
+
+.num-btn.selected {
+    background: var(--green);
+    color: #FFFFFF;
+    transform: scale(1.06);
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
+}
+
+.num-btn.reserved {
+    background: #FEF3C7;
+    color: #B45309;
+    cursor: not-allowed;
+}
+
+.num-btn.sold {
+    background: #F3F4F6;
+    color: #9CA3AF;
+    text-decoration: line-through;
+    cursor: not-allowed;
+}
+
+/* Barra Inferior Fixa */
+#bottom-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #FFFFFF;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    padding: 12px 16px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#selected-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 60px;
+    overflow-y: auto;
+}
+
+.chip {
+    background: #ECFDF5;
+    color: var(--green-dark);
+    font-weight: 700;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.chip::after {
+    content: "✕";
+    font-size: 10px;
+}
+
+.bar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.total-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.total-label {
+    font-size: 12px;
+    color: #6B7280;
+}
+
+#total-value {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--green-dark);
+}
+
+#btn-buy {
+    background: var(--green);
+    color: #FFFFFF;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    flex: 1;
+    max-width: 200px;
+}
+
+#btn-buy:active {
+    background: var(--green-dark);
+}
+
+/* Modais */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+}
+
+.modal-content {
+    background: #FFFFFF;
+    border-radius: 20px;
+    padding: 24px;
+    width: 100%;
+    max-width: 420px;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+.modal-content h2 {
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.modal-sub {
+    font-size: 14px;
+    color: #6B7280;
+    margin-bottom: 20px;
+}
+
+input[type="text"], input[type="tel"] {
+    width: 100%;
+    padding: 14px;
+    border: 1px solid #D1D5DB;
+    border-radius: 12px;
+    font-size: 16px;
+    margin-bottom: 12px;
+    outline: none;
+}
+
+input:focus {
+    border-color: var(--green);
+}
+
+.error-text {
+    color: var(--red);
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+.btn-primary {
+    width: 100%;
+    background: var(--green);
+    color: #FFFFFF;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+
+.btn-text {
+    width: 100%;
+    background: transparent;
+    color: #6B7280;
+    border: none;
+    padding: 10px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+/* Modal Sucesso */
+.text-center { text-align: center; }
+
+.success-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
+}
+
+.numbers-highlight {
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--green-dark);
+    margin-bottom: 16px;
+}
+
+.pix-box {
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    border-radius: 12px;
+    padding: 14px;
+    margin: 16px 0;
+    text-align: left;
+}
+
+.pix-box label {
+    font-size: 12px;
+    color: #92400E;
+    font-weight: 600;
+
+}
+
+#pix-key {
+    font-family: monospace;
+    font-size: 14px;
+    word-break: break-all;
+    background: #FFFFFF;
+    padding: 10px;
+    border-radius: 8px;
+    margin: 8px 0;
+    border: 1px solid #F3F4F6;
+    user-select: all;
+}
+
+#btn-copy {
+    background: #F59E0B;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+}
+
+.pix-amount {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--green-dark);
+    margin-bottom: 12px;
+}
+
+.instruction {
+    font-size: 14px;
+    color: #4B5563;
+    margin-bottom: 16px;
+    line-height: 1.4;
+}
+
+.btn-whatsapp {
+    display: block;
+    background: #25D366;
+    color: #FFFFFF;
+    text-align: center;
+    padding: 14px;
+    border-radius: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    font-size: 15px;
+    margin-bottom: 12px;
+}
+
+.small-text {
+    font-size: 12px;
+    color: #9CA3AF;
+}
+
+/* Utilitário */
+.hidden {
+    display: none !important;
+}
