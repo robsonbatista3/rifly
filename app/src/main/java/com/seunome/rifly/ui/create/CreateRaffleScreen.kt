@@ -20,8 +20,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -197,15 +199,45 @@ fun CreateRaffleScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Prêmio
-            OutlinedTextField(
-                value = state.prize,
-                onValueChange = { prize -> viewModel.updateState { it.copy(prize = prize, error = null) } },
-                label = { Text("Prêmio *") },
-                placeholder = { Text("ex: iPhone 15, Moto Honda, R$ 5.000") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // Seção de Prêmios
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text = "🎁 Prêmios", style = MaterialTheme.typography.titleSmall)
+
+                state.prizes.forEachIndexed { index, prize ->
+                    val label = when (index) {
+                        0 -> "🥇 1º prêmio *"
+                        1 -> "🥈 2º prêmio *"
+                        2 -> "🥉 3º prêmio *"
+                        else -> "🏅 ${index + 1}º prêmio *"
+                    }
+
+                    OutlinedTextField(
+                        value = prize,
+                        onValueChange = { name -> viewModel.updatePrize(index, name) },
+                        label = { Text(label) },
+                        singleLine = true,
+                        trailingIcon = {
+                            if (state.prizes.size > 1) {
+                                IconButton(onClick = { viewModel.removePrize(index) }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remover prêmio")
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                if (state.prizes.size < 5) {
+                    TextButton(
+                        onClick = { viewModel.addPrize() },
+                        modifier = Modifier.align(Alignment.Start)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("+ Adicionar prêmio")
+                    }
+                }
+            }
 
             // Preço por número + Total de números
             Row(

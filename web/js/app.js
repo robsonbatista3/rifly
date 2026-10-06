@@ -8,7 +8,9 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let raffle = null;
 let creator = null;
 let reservations = [];
+let prizes = [];
 let selected = [];
+let countdownInterval = null;
 const MAX_NUMBERS = 20;
 
 function getSlugFromUrl() {
@@ -27,6 +29,7 @@ async function init() {
         await loadRaffle(slug);
         await loadReservations();
         await loadCreator();
+        await loadPrizes();
         renderAll();
         setInterval(refreshReservations, 15000);
     } catch (e) {
@@ -84,6 +87,22 @@ async function loadCreator() {
     }
 }
 
+async function loadPrizes() {
+    if (!raffle) return;
+    try {
+        const { data } = await supabase
+            .from("prizes")
+            .select("*")
+            .eq("raffle_id", raffle.id)
+            .order("position", { ascending: true });
+        if (data && data.length > 0) {
+            prizes = data;
+        }
+    } catch (e) {
+        // ignora falha silenciosamente
+    }
+}
+
 function getTakenNumbers() {
     const reserved = new Set();
     const sold = new Set();
@@ -122,7 +141,17 @@ function renderAll() {
     document.getElementById("raffle-content").classList.remove("hidden");
 
     document.getElementById("raffle-title").innerText = raffle.title;
-    document.getElementById("raffle-prize").innerText = `🏆 Prêmio: ${raffle.prize}`;
+
+    const prizeEl = document.getElementById("raffle-prize");
+    if (prizes.length > 0) {
+        const medals = ["🥇", "🥈", "🥉", "🏅", "🏅"];
+        prizeEl.innerHTML = prizes.map((p, idx) =>
+            `<div>${medals[idx] || "🏅"} ${p.position}º prêmio: ${p.prize_name}</div>`
+        ).join("");
+    } else {
+        prizeEl.innerText = `🏆 Prêmio: ${raffle.prize}`;
+    }
+
     document.getElementById("raffle-price").innerText = `${formatBRL(raffle.price_per_ticket)} / número`;
     document.getElementById("raffle-description").innerText = raffle.description || "";
 
@@ -140,10 +169,56 @@ function renderAll() {
     const drawnBanner = document.getElementById("drawn-banner");
     if (raffle.status === "DRAWN") {
         drawnBanner.classList.remove("hidden");
-        document.getElementById("drawn-info").innerText =
-            `Número vencedor: #${String(raffle.winner_number || 0).padStart(2, "0")} - Ganhador: ${raffle.winner_name || "N/A"}`;
+        if (prizes.length > 0 && prizes.some(p => p.winner_number !== null)) {
+            const medals = ["🥇", "🥈", "🥉", "🏅", "🏅"];
+            const lines = prizes.map((p, idx) => {
+                const num = p.winner_number ? `#${String(p.winner_number).padStart(2, "0")}` : "—";
+                const name = p.winner_name || "N/A";
+                return `<div>${medals[idx] || "🏅"} ${p.position}º lugar (${p.prize_name}): ${num} — ${name}</div>`;
+            }).join("");
+            document.getElementById("drawn-info").innerHTML = lines;
+        } else {
+            document.getElementById("drawn-info").innerText =
+                `Número vencedor: #${String(raffle.winner_number || 0).padStart(2, "0")} - Ganhador: ${raffle.winner_name || "N/A"}`;
+        }
     } else {
         drawnBanner.classList.add("hidden");
+    }
+
+    // Contagem Regressiva
+    const countdownBanner = document.getElementById("countdown-banner");
+    if (countdownInterval) clearInterval(countdownInterval);
+
+    if (raffle.draw_date && raffle.status === "ACTIVE") {
+        if (countdownBanner) countdownBanner.classList.remove("hidden");
+
+        const updateCountdown = () => {
+            const datePart = String(raffle.draw_date).split("T")[0];
+            const target = new Date(datePart + "T23:59:59").getTime();
+            const diff = target - Date.now();
+
+            if (diff > 0) {
+                const dias = Math.floor(diff / 86400000);
+                const horas = Math.floor((diff % 86400000) / 3600000);
+                const min = Math.floor((diff % 3600000) / 60000);
+                const seg = Math.floor((diff % 60000) / 1000);
+
+                const pad = (n) => String(n).padStart(2, "0");
+                if (countdownBanner) {
+                    countdownBanner.innerText = `⏰ Sorteio em: ${dias}d ${pad(horas)}h ${pad(min)}m ${pad(seg)}s`;
+                }
+            } else {
+                if (countdownBanner) {
+                    countdownBanner.innerText = "⏰ Hora do sorteio chegou!";
+                }
+                if (countdownInterval) clearInterval(countdownInterval);
+            }
+        };
+
+        updateCountdown();
+        countdownInterval = setInterval(updateCountdown, 1000);
+    } else {
+        if (countdownBanner) countdownBanner.classList.add("hidden");
     }
 
     renderGrid();
@@ -304,6 +379,7 @@ async function confirmReservation() {
         const numbersFormatted = reservedNumbers.map(n => `#${String(n).padStart(totalDigits, "0")}`).join(", ");
         await supabase.from("notifications").insert({
             user_id: raffle.creator_id,
+            raffle_id: raffle.id,
             title: "🎟️ Nova reserva!",
             message: `${nameInput} reservou o(s) número(s) ${numbersFormatted} - ${formatBRL(total)}`,
             type: "new_reservation"

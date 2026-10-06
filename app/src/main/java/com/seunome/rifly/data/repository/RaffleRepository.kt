@@ -6,6 +6,20 @@ import com.seunome.rifly.data.model.Reservation
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.storage.storage
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class RaffleDrawUpdate(
+    val status: String,
+    @SerialName("winner_number") val winnerNumber: Int? = null,
+    @SerialName("winner_name") val winnerName: String? = null
+)
+
+@Serializable
+data class RaffleStatusUpdate(
+    val status: String
+)
 
 class RaffleRepository {
 
@@ -48,9 +62,50 @@ class RaffleRepository {
         }
     }
 
-    suspend fun updateRaffle(raffleId: String, updates: Map<String, Any?>): Result<Unit> {
+    suspend fun getRaffleById(id: String): Result<Raffle?> {
         return try {
-            SupabaseConfig.client.from("raffles").update(updates) {
+            val raffle = SupabaseConfig.client.from("raffles").select {
+                filter {
+                    eq("id", id)
+                }
+            }.decodeSingleOrNull<Raffle>()
+            Result.success(raffle)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateRaffleDraw(raffleId: String, status: String, winnerNumber: Int?, winnerName: String?): Result<Unit> {
+        return try {
+            val update = RaffleDrawUpdate(status, winnerNumber, winnerName)
+            SupabaseConfig.client.from("raffles").update(update) {
+                filter {
+                    eq("id", raffleId)
+                }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateRaffleStatus(raffleId: String, status: String): Result<Unit> {
+        return try {
+            val update = RaffleStatusUpdate(status)
+            SupabaseConfig.client.from("raffles").update(update) {
+                filter {
+                    eq("id", raffleId)
+                }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteRaffle(raffleId: String): Result<Unit> {
+        return try {
+            SupabaseConfig.client.from("raffles").delete {
                 filter {
                     eq("id", raffleId)
                 }

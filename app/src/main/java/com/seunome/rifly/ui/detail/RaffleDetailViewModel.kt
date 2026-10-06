@@ -2,14 +2,17 @@ package com.seunome.rifly.ui.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.seunome.rifly.data.model.Prize
 import com.seunome.rifly.data.model.Raffle
 import com.seunome.rifly.data.model.Reservation
+import com.seunome.rifly.data.repository.PrizeRepository
 import com.seunome.rifly.data.repository.RaffleRepository
 import com.seunome.rifly.data.repository.ReservationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -18,12 +21,16 @@ class RaffleDetailViewModel : ViewModel() {
 
     private val reservationRepository = ReservationRepository()
     private val raffleRepository = RaffleRepository()
+    private val prizeRepository = PrizeRepository()
 
     private val _raffle = MutableStateFlow<Raffle?>(null)
     val raffle: StateFlow<Raffle?> = _raffle.asStateFlow()
 
     private val _reservations = MutableStateFlow<List<Reservation>>(emptyList())
     val reservations: StateFlow<List<Reservation>> = _reservations.asStateFlow()
+
+    private val _prizes = MutableStateFlow<List<Prize>>(emptyList())
+    val prizes: StateFlow<List<Prize>> = _prizes.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -38,6 +45,15 @@ class RaffleDetailViewModel : ViewModel() {
     val confirmedReservations: StateFlow<List<Reservation>> = _reservations.map { list ->
         list.filter { it.status == "CONFIRMED" }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val confirmedCount: StateFlow<Int> = confirmedReservations.map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val canBeDeleted: StateFlow<Boolean> = _raffle.map { r ->
+        r?.status == "ACTIVE"
+    }.combine(confirmedCount) { isActive, count ->
+        isActive && count == 0
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val confirmedNumbers: StateFlow<Set<Int>> = _reservations.map { list ->
         list.filter { it.status == "CONFIRMED" }.flatMap { it.numbers }.toSet()
@@ -59,8 +75,8 @@ class RaffleDetailViewModel : ViewModel() {
         val currentRaffle = _raffle.value ?: return
         _isLoading.value = true
         viewModelScope.launch {
-            val result = reservationRepository.getReservationsByRaffle(currentRaffle.id)
-            result.fold(
+            val resResult = reservationRepository.getReservationsByRaffle(currentRaffle.id)
+            resResult.fold(
                 onSuccess = { list ->
                     _reservations.value = list
                 },
@@ -68,6 +84,17 @@ class RaffleDetailViewModel : ViewModel() {
                     _message.value = "Erro ao carregar reservas: ${ex.localizedMessage}"
                 }
             )
+
+            val prizeResult = prizeRepository.getPrizesByRaffle(currentRaffle.id)
+            prizeResult.getOrNull()?.let { list ->
+                _prizes.value = list
+            }
+
+            val raffleResult = raffleRepository.getRaffleById(currentRaffle.id)
+            raffleResult.getOrNull()?.let { updatedRaffle ->
+                _raffle.value = updatedRaffle
+            }
+
             _isLoading.value = false
         }
     }
@@ -100,6 +127,49 @@ class RaffleDetailViewModel : ViewModel() {
                 },
                 onFailure = { ex ->
                     _message.value = "Erro ao cancelar reserva: ${ex.localizedMessage}"
+                    _isLoading.value = false
+                }
+            )
+        }
+    }
+
+    fun cancelRaffle(onSuccess: () -> Unit) {
+        val currentRaffle = _raffle.value ?: return
+        viewModelScope.launch {
+            _isLoading.value = true
+            val result = raffleRepository.updateRaffleStatus(currentRaffle.id, "CANCELLED")
+            result.fold(
+                onSuccess = {
+                    _message.value = "Rifa cancelada com sucesso"
+                    _raffle.value = currentRaffle.copy(status = "CANCELLED")
+                    _isLoading.value = false
+                    onSuccess()
+                },
+                onFailure = { ex ->
+                    _message.value = "Erro ao cancelar rifa: ${ex.localizedMessage}"
+                    _isLoading.value = false
+                }
+            )
+        }
+    }
+
+    fun deleteRaffle(onSuccess: () -> Unit) {
+        val currentRaffle = _raffle.value ?: return
+        if (confirmedCount.value > 0 || currentRaffle.status != "ACTIVE") {
+            _message.value = "Esta rifa não pode ser excluída pois possui vendas confirmadas."
+            return
+        }
+        viewModelScope.launch {
+            _isLoading.value = true
+            val result = raffleRepository.deleteRaffle(currentRaffle.id)
+            result.fold(
+                onSuccess = {
+                    _message.value = "Rifa excluída com sucesso"
+                    _isLoading.value = false
+                    onSuccess()
+                },
+                onFailure = { ex ->
+                    _message.value = "Erro ao excluir rifa: ${ex.localizedMessage}"
                     _isLoading.value = false
                 }
             )

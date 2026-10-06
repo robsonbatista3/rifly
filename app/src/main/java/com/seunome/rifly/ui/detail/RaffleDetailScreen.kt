@@ -2,11 +2,6 @@ package com.seunome.rifly.ui.detail
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,7 +24,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -40,6 +37,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,8 +59,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,26 +74,34 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.seunome.rifly.data.model.Raffle
 import com.seunome.rifly.data.model.Reservation
+import com.seunome.rifly.ui.components.QrCodeDialog
 import com.seunome.rifly.util.Utils
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.net.URLEncoder
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalAnimationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun RaffleDetailScreen(
     raffle: Raffle,
     onBack: () -> Unit,
+    onOpenReport: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: RaffleDetailViewModel = viewModel(),
     drawViewModel: DrawViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val currentRaffleState by viewModel.raffle.collectAsState()
+    val displayRaffle = currentRaffleState ?: raffle
 
     val isLoading by viewModel.isLoading.collectAsState()
     val message by viewModel.message.collectAsState()
@@ -100,12 +109,18 @@ fun RaffleDetailScreen(
     val confirmedReservations by viewModel.confirmedReservations.collectAsState()
     val soldCount by viewModel.soldCount.collectAsState()
     val revenue by viewModel.revenue.collectAsState()
+    val prizes by viewModel.prizes.collectAsState()
+    val canBeDeleted by viewModel.canBeDeleted.collectAsState()
 
     val drawState by drawViewModel.state.collectAsState()
-    val drawAnimation by drawViewModel.animation.collectAsState()
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var showDrawDialog by remember { mutableStateOf(false) }
+    var showDrawShow by remember { mutableStateOf(false) }
+    var showQrDialog by remember { mutableStateOf(false) }
+    var showCancelRaffleDialog by remember { mutableStateOf(false) }
+    var showDeleteRaffleDialog by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
     var lotteryInput by remember { mutableStateOf("") }
 
     LaunchedEffect(raffle) {
@@ -125,6 +140,65 @@ fun RaffleDetailScreen(
         }
     }
 
+    if (showQrDialog) {
+        QrCodeDialog(
+            raffle = displayRaffle,
+            onDismiss = { showQrDialog = false }
+        )
+    }
+
+    if (showCancelRaffleDialog) {
+        AlertDialog(
+            onDismissRequest = { showCancelRaffleDialog = false },
+            title = { Text("Cancelar rifa?") },
+            text = { Text("Deseja realmente cancelar a rifa \"${displayRaffle.title}\"? Ela deixará de aceitar reservas.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCancelRaffleDialog = false
+                        viewModel.cancelRaffle {
+                            viewModel.refresh()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Cancelar Rifa")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelRaffleDialog = false }) {
+                    Text("Voltar")
+                }
+            }
+        )
+    }
+
+    if (showDeleteRaffleDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteRaffleDialog = false },
+            title = { Text("Excluir rifa?") },
+            text = { Text("Deseja realmente excluir permanentemente esta rifa sem vendas?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteRaffleDialog = false
+                        viewModel.deleteRaffle {
+                            onBack()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Excluir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteRaffleDialog = false }) {
+                    Text("Voltar")
+                }
+            }
+        )
+    }
+
     // Diálogo de confirmação de sorteio
     if (showDrawDialog) {
         AlertDialog(
@@ -132,7 +206,7 @@ fun RaffleDetailScreen(
             title = { Text("Sortear rifa?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (raffle.drawType == "LOTERY") {
+                    if (displayRaffle.drawType == "LOTERY") {
                         Text("Informe o número do 1º prêmio da Loteria Federal:")
                         OutlinedTextField(
                             value = lotteryInput,
@@ -152,15 +226,18 @@ fun RaffleDetailScreen(
                 Button(
                     onClick = {
                         showDrawDialog = false
-                        if (raffle.drawType == "LOTERY") {
-                            drawViewModel.drawByLottery(raffle, confirmedReservations, lotteryInput)
+                        val nums = if (displayRaffle.drawType == "LOTERY") {
+                            drawViewModel.drawByLottery(displayRaffle, confirmedReservations, lotteryInput, prizes)
                         } else {
-                            drawViewModel.drawRandom(raffle, confirmedReservations)
+                            drawViewModel.drawRandom(displayRaffle, confirmedReservations, prizes)
+                        }
+                        if (nums.isNotEmpty()) {
+                            showDrawShow = true
                         }
                     },
-                    enabled = raffle.drawType != "LOTERY" || lotteryInput.isNotBlank()
+                    enabled = displayRaffle.drawType != "LOTERY" || lotteryInput.isNotBlank()
                 ) {
-                    Text("Sortear")
+                    Text("Iniciar Sorteio")
                 }
             },
             dismissButton = {
@@ -171,50 +248,29 @@ fun RaffleDetailScreen(
         )
     }
 
-    // Overlay de Animação de Sorteio
-    if (drawAnimation is DrawAnimationState.Rolling) {
-        val rollingNumber = (drawAnimation as DrawAnimationState.Rolling).currentNumber
-        Dialog(onDismissRequest = {}) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "🎰 Sorteando...",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    AnimatedContent(
-                        targetState = rollingNumber,
-                        transitionSpec = {
-                            scaleIn() togetherWith scaleOut()
-                        },
-                        label = "rollingNumber"
-                    ) { targetNum ->
-                        Text(
-                            text = String.format(Locale.getDefault(), "#%02d", targetNum),
-                            style = MaterialTheme.typography.displayLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
+    // Show de Sorteio Espectacular
+    if (showDrawShow && drawState.winnerNumbers.isNotEmpty()) {
+        DrawShowDialog(
+            raffle = displayRaffle,
+            confirmedReservations = confirmedReservations,
+            prizes = prizes,
+            computedWinningNumbers = drawState.winnerNumbers,
+            winnerNames = drawState.winnerNames,
+            onFinished = {
+                showDrawShow = false
+                scope.launch {
+                    drawViewModel.persistDraw(displayRaffle, prizes)
+                    viewModel.refresh()
                 }
-            }
-        }
+            },
+            onDismiss = { showDrawShow = false }
+        )
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(raffle.title) },
+                title = { Text(displayRaffle.title) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -224,6 +280,12 @@ fun RaffleDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showQrDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.QrCode2,
+                            contentDescription = "QR Code"
+                        )
+                    }
                     IconButton(onClick = { viewModel.refresh() }) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
@@ -231,7 +293,7 @@ fun RaffleDetailScreen(
                         )
                     }
                     IconButton(onClick = {
-                        val shareMessage = Utils.buildShareMessage(raffle)
+                        val shareMessage = Utils.buildShareMessage(displayRaffle)
                         val encodedMessage = URLEncoder.encode(shareMessage, "UTF-8")
                         val intent = Intent(
                             Intent.ACTION_VIEW,
@@ -243,6 +305,39 @@ fun RaffleDetailScreen(
                             imageVector = Icons.Default.Share,
                             contentDescription = "Compartilhar"
                         )
+                    }
+
+                    if (displayRaffle.status == "ACTIVE") {
+                        Box {
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "Mais opções"
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("❌ Cancelar rifa") },
+                                    onClick = {
+                                        showMenu = false
+                                        showCancelRaffleDialog = true
+                                    }
+                                )
+                                if (canBeDeleted) {
+                                    DropdownMenuItem(
+                                        text = { Text("🗑️ Excluir rifa", color = MaterialTheme.colorScheme.error) },
+                                        onClick = {
+                                            showMenu = false
+                                            showDeleteRaffleDialog = true
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             )
@@ -264,12 +359,8 @@ fun RaffleDetailScreen(
             ) {
 
                 // CARD DE RESULTADO DO SORTEIO (Se sorteada)
-                val currentStatus = if (drawAnimation is DrawAnimationState.Finished) "DRAWN" else raffle.status
+                val currentStatus = displayRaffle.status
                 if (currentStatus == "DRAWN") {
-                    val winningNum = drawState.winnerNumber ?: raffle.winnerNumber ?: 0
-                    val winnerName = drawState.winnerName ?: raffle.winnerName ?: "Não identificado"
-                    val winnerPhone = drawState.winnerPhone
-
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
@@ -291,36 +382,57 @@ fun RaffleDetailScreen(
                                 color = Color(0xFF2E7D32)
                             )
 
-                            Text(
-                                text = String.format(Locale.getDefault(), "Número vencedor: #%02d", winningNum),
-                                style = MaterialTheme.typography.displaySmall,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center,
-                                color = Color(0xFF1B5E20)
-                            )
+                            if (prizes.isNotEmpty() && prizes.any { it.winnerNumber != null }) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    prizes.forEach { prize ->
+                                        val medal = when (prize.position) {
+                                            1 -> "🥇 1º lugar"
+                                            2 -> "🥈 2º lugar"
+                                            3 -> "🥉 3º lugar"
+                                            else -> "🏅 ${prize.position}º lugar"
+                                        }
+                                        val numStr = if (prize.winnerNumber != null) String.format(Locale.getDefault(), "#%02d", prize.winnerNumber) else "—"
+                                        val nameStr = prize.winnerName ?: "N/A"
 
-                            Text(
-                                text = "👤 Vencedor: $winnerName",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-
-                            if (!winnerPhone.isNullOrBlank()) {
+                                        Text(
+                                            text = "$medal — ${prize.prizeName}: número $numStr — $nameStr",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            } else {
+                                val winningNum = drawState.winnerNumber ?: displayRaffle.winnerNumber ?: 0
+                                val winnerName = drawState.winnerName ?: displayRaffle.winnerName ?: "Não identificado"
                                 Text(
-                                    text = "📱 Telefone: $winnerPhone",
-                                    style = MaterialTheme.typography.bodyMedium
+                                    text = String.format(Locale.getDefault(), "Número vencedor: #%02d", winningNum),
+                                    style = MaterialTheme.typography.displaySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    color = Color(0xFF1B5E20)
+                                )
+                                Text(
+                                    text = "👤 Vencedor: $winnerName",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
+
+                            val firstWinnerPhone = drawState.winnerPhone ?: prizes.firstOrNull()?.winnerPhone
+                            val firstWinnerNum = drawState.winnerNumber ?: prizes.firstOrNull()?.winnerNumber ?: displayRaffle.winnerNumber ?: 0
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                if (!winnerPhone.isNullOrBlank()) {
+                                if (!firstWinnerPhone.isNullOrBlank()) {
                                     Button(
                                         onClick = {
-                                            val msg = "Parabéns! Você ganhou na rifa ${raffle.title} com o número $winningNum! 🎉"
-                                            val url = "https://wa.me/55${winnerPhone.replace(Regex("\\D"), "")}?text=${URLEncoder.encode(msg, "UTF-8")}"
+                                            val msg = "Parabéns! Você ganhou na rifa ${displayRaffle.title} com o número $firstWinnerNum! 🎉"
+                                            val url = "https://wa.me/55${firstWinnerPhone.replace(Regex("\\D"), "")}?text=${URLEncoder.encode(msg, "UTF-8")}"
                                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                             context.startActivity(intent)
                                         },
@@ -333,8 +445,24 @@ fun RaffleDetailScreen(
 
                                 Button(
                                     onClick = {
-                                        val msg = "🎉 RESULTADO DA RIFA ${raffle.title}!\n\n🏆 Número $winningNum\n👤 Vencedor: $winnerName\n\nObrigado a todos que participaram!"
-                                        val url = "https://wa.me/?text=${URLEncoder.encode(msg, "UTF-8")}"
+                                        val shareText = if (prizes.isNotEmpty() && prizes.any { it.winnerNumber != null }) {
+                                            val lines = prizes.joinToString("\n") { p ->
+                                                val m = when (p.position) {
+                                                    1 -> "🥇"
+                                                    2 -> "🥈"
+                                                    3 -> "🥉"
+                                                    else -> "🏅"
+                                                }
+                                                "$m ${p.position}º lugar (${p.prizeName}): #${p.winnerNumber ?: 0} — ${p.winnerName ?: "N/A"}"
+                                            }
+                                            "🎉 RESULTADO DA RIFA ${displayRaffle.title}!\n\n$lines\n\nObrigado a todos que participaram!"
+                                        } else {
+                                            val winningNum = drawState.winnerNumber ?: displayRaffle.winnerNumber ?: 0
+                                            val winnerName = drawState.winnerName ?: displayRaffle.winnerName ?: "N/A"
+                                            "🎉 RESULTADO DA RIFA ${displayRaffle.title}!\n\n🏆 Número $winningNum\n👤 Vencedor: $winnerName\n\nObrigado a todos que participaram!"
+                                        }
+
+                                        val url = "https://wa.me/?text=${URLEncoder.encode(shareText, "UTF-8")}"
                                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                         context.startActivity(intent)
                                     },
@@ -355,10 +483,10 @@ fun RaffleDetailScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (raffle.imageUrl != null) {
+                        if (displayRaffle.imageUrl != null) {
                             AsyncImage(
-                                model = raffle.imageUrl,
-                                contentDescription = raffle.title,
+                                model = displayRaffle.imageUrl,
+                                contentDescription = displayRaffle.title,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -368,15 +496,37 @@ fun RaffleDetailScreen(
                         }
 
                         Text(
-                            text = raffle.title,
+                            text = displayRaffle.title,
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold
                         )
 
-                        Text(
-                            text = "🏆 Prêmio: ${raffle.prize}",
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        if (prizes.isNotEmpty()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "🏆 Prêmios:",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                prizes.forEach { prize ->
+                                    val medal = when (prize.position) {
+                                        1 -> "🥇 1º"
+                                        2 -> "🥈 2º"
+                                        3 -> "🥉 3º"
+                                        else -> "🏅 ${prize.position}º"
+                                    }
+                                    Text(
+                                        text = "$medal: ${prize.prizeName}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = "🏆 Prêmio: ${displayRaffle.prize}",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -397,7 +547,7 @@ fun RaffleDetailScreen(
                                 )
                             )
 
-                            val drawTypeText = if (raffle.drawType == "LOTERY") "🎰 Loteria Federal" else "🎲 Aleatório pelo app"
+                            val drawTypeText = if (displayRaffle.drawType == "LOTERY") "🎰 Loteria Federal" else "🎲 Aleatório pelo app"
                             Text(
                                 text = drawTypeText,
                                 style = MaterialTheme.typography.bodyMedium
@@ -409,21 +559,30 @@ fun RaffleDetailScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "💰 ${Utils.formatCurrency(raffle.pricePerTicket)}/número",
+                                text = "💰 ${Utils.formatCurrency(displayRaffle.pricePerTicket)}/número",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Text(
-                                text = "🔢 ${raffle.totalNumbers} números",
+                                text = "🔢 ${displayRaffle.totalNumbers} números",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
 
-                        if (!raffle.drawDate.isNullOrBlank()) {
+                        if (!displayRaffle.drawDate.isNullOrBlank()) {
                             Text(
-                                text = "📅 Sorteio: ${raffle.drawDate}",
+                                text = "📅 Sorteio: ${Utils.formatIsoToBrazilianDate(displayRaffle.drawDate)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+
+                        OutlinedButton(
+                            onClick = { showQrDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.QrCode2, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("🔳 Ver QR Code da Rifa")
                         }
                     }
                 }
@@ -447,10 +606,10 @@ fun RaffleDetailScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "Números vendidos: $soldCount de ${raffle.totalNumbers}",
+                                text = "Números vendidos: $soldCount de ${displayRaffle.totalNumbers}",
                                 style = MaterialTheme.typography.bodyMedium
                             )
-                            val percentage = if (raffle.totalNumbers > 0) (soldCount.toFloat() / raffle.totalNumbers * 100).toInt() else 0
+                            val percentage = if (displayRaffle.totalNumbers > 0) (soldCount.toFloat() / displayRaffle.totalNumbers * 100).toInt() else 0
                             Text(
                                 text = "$percentage%",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -458,7 +617,7 @@ fun RaffleDetailScreen(
                             )
                         }
 
-                        val progress = if (raffle.totalNumbers > 0) soldCount.toFloat() / raffle.totalNumbers else 0f
+                        val progress = if (displayRaffle.totalNumbers > 0) soldCount.toFloat() / displayRaffle.totalNumbers else 0f
                         LinearProgressIndicator(
                             progress = { progress },
                             modifier = Modifier
@@ -475,6 +634,65 @@ fun RaffleDetailScreen(
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        OutlinedButton(
+                            onClick = onOpenReport,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("📊 Ver relatório completo")
+                        }
+                    }
+                }
+
+                // CARD DE CONTAGEM REGRESSIVA (Se drawDate != null e status == "ACTIVE")
+                if (!displayRaffle.drawDate.isNullOrBlank() && currentStatus == "ACTIVE") {
+                    var remainingMillis by remember { mutableLongStateOf(0L) }
+
+                    LaunchedEffect(displayRaffle.drawDate) {
+                        while (isActive) {
+                            val target = Utils.parseDrawDateToMillis(displayRaffle.drawDate)
+                            remainingMillis = (target ?: 0L) - System.currentTimeMillis()
+                            delay(1000)
+                        }
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            if (remainingMillis > 0) {
+                                Text(
+                                    text = "⏰ Sorteio em:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = Utils.formatCountdown(remainingMillis),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF2E7D32),
+                                    textAlign = TextAlign.Center
+                                )
+                            } else {
+                                Text(
+                                    text = "⏰ Hora do sorteio chegou!",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFF59E0B),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
                     }
                 }
 

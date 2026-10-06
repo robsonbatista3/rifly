@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.seunome.rifly.data.model.Raffle
 import com.seunome.rifly.data.repository.AuthRepository
+import com.seunome.rifly.data.repository.PrizeRepository
 import com.seunome.rifly.data.repository.RaffleRepository
 import com.seunome.rifly.util.Utils
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,11 +12,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 data class CreateRaffleState(
     val title: String = "",
     val description: String = "",
-    val prize: String = "",
+    val prizes: List<String> = listOf(""),
     val pricePerTicket: String = "",
     val totalNumbers: String = "",
     val pixKey: String = "",
@@ -32,12 +35,35 @@ class CreateRaffleViewModel : ViewModel() {
 
     private val raffleRepository = RaffleRepository()
     private val authRepository = AuthRepository()
+    private val prizeRepository = PrizeRepository()
 
     private val _state = MutableStateFlow(CreateRaffleState())
     val state: StateFlow<CreateRaffleState> = _state.asStateFlow()
 
     fun updateState(transform: (CreateRaffleState) -> CreateRaffleState) {
         _state.update(transform)
+    }
+
+    fun addPrize() {
+        val currentPrizes = _state.value.prizes
+        if (currentPrizes.size < 5) {
+            _state.update { it.copy(prizes = currentPrizes + "") }
+        }
+    }
+
+    fun removePrize(index: Int) {
+        val currentPrizes = _state.value.prizes
+        if (currentPrizes.size > 1 && index in currentPrizes.indices) {
+            _state.update { it.copy(prizes = currentPrizes.filterIndexed { i, _ -> i != index }) }
+        }
+    }
+
+    fun updatePrize(index: Int, name: String) {
+        val currentPrizes = _state.value.prizes.toMutableList()
+        if (index in currentPrizes.indices) {
+            currentPrizes[index] = name
+            _state.update { it.copy(prizes = currentPrizes, error = null) }
+        }
     }
 
     fun createRaffle() {
@@ -47,8 +73,8 @@ class CreateRaffleViewModel : ViewModel() {
             _state.update { it.copy(error = "Informe o título da rifa.") }
             return
         }
-        if (currentState.prize.isBlank()) {
-            _state.update { it.copy(error = "Informe o prêmio da rifa.") }
+        if (currentState.prizes.any { it.isBlank() }) {
+            _state.update { it.copy(error = "Preencha o nome de todos os prêmios.") }
             return
         }
         if (currentState.pixKey.isBlank()) {
@@ -93,11 +119,24 @@ class CreateRaffleViewModel : ViewModel() {
 
             val slug = Utils.generateSlug(currentState.title)
 
+            val isoDrawDate = currentState.drawDate?.let { dateStr ->
+                try {
+                    val inputFormat = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
+                    val parsedDate = inputFormat.parse(dateStr)
+                    val outputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                    parsedDate?.let { outputFormat.format(it) }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+
+            val primaryPrizeName = currentState.prizes.firstOrNull { it.isNotBlank() } ?: "Prêmio"
+
             val raffle = Raffle(
                 creatorId = userId,
                 title = currentState.title,
                 description = currentState.description.ifBlank { null },
-                prize = currentState.prize,
+                prize = primaryPrizeName,
                 imageUrl = imageUrl,
                 pricePerTicket = price,
                 totalNumbers = total,
@@ -106,13 +145,16 @@ class CreateRaffleViewModel : ViewModel() {
                 slug = slug,
                 status = "ACTIVE",
                 drawType = currentState.drawType,
-                drawDate = currentState.drawDate
+                drawDate = isoDrawDate
             )
 
             val createResult = raffleRepository.createRaffle(raffle)
             createResult.fold(
-                onSuccess = {
-                    _state.update { it.copy(isLoading = false, createdSlug = slug) }
+                onSuccess = { raffleId ->
+                    viewModelScope.launch {
+                        prizeRepository.insertPrizes(raffleId, currentState.prizes)
+                        _state.update { it.copy(isLoading = false, createdSlug = slug) }
+                    }
                 },
                 onFailure = { ex ->
                     _state.update { it.copy(isLoading = false, error = "Erro ao criar rifa: ${ex.localizedMessage}") }

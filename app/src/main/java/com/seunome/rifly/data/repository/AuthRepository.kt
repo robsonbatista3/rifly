@@ -1,9 +1,11 @@
 package com.seunome.rifly.data.repository
 
+import android.util.Log
 import com.seunome.rifly.SupabaseConfig
 import com.seunome.rifly.data.model.Profile
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 
 class AuthRepository {
@@ -33,13 +35,46 @@ class AuthRepository {
             val profile = Profile(
                 id = userId,
                 name = name,
+                email = email,
                 phone = phone,
-                pixKey = null
+                pixKey = null,
+                role = "user"
             )
             SupabaseConfig.client.postgrest["profiles"].insert(profile)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    suspend fun getCurrentProfile(): Result<Profile?> {
+        val userId = getCurrentUserId() ?: return Result.success(null)
+        return try {
+            val profile = SupabaseConfig.client.from("profiles").select {
+                filter {
+                    eq("id", userId)
+                }
+            }.decodeSingleOrNull<Profile>()
+            Result.success(profile)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun isAdmin(): Boolean {
+        val userId = getCurrentUserId() ?: return false
+        return try {
+            val profile = SupabaseConfig.client.from("profiles").select {
+                filter {
+                    eq("id", userId)
+                }
+            }.decodeSingleOrNull<Profile>()
+            val admin = profile?.role == "admin"
+            Log.d("AdminDebug", "isAdmin result = $admin for userId = $userId (role=${profile?.role})")
+            admin
+        } catch (e: Exception) {
+            Log.e("AdminDebug", "falha ao verificar isAdmin", e)
+            false
         }
     }
 

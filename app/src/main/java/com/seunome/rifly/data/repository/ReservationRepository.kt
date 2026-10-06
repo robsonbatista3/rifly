@@ -4,10 +4,24 @@ import com.seunome.rifly.SupabaseConfig
 import com.seunome.rifly.data.model.Reservation
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+
+@Serializable
+data class ReservationConfirmUpdate(
+    val status: String = "CONFIRMED",
+    @SerialName("confirmed_at") val confirmedAt: String
+)
+
+@Serializable
+data class ReservationCancelUpdate(
+    val status: String = "CANCELLED",
+    @SerialName("canceled_at") val canceledAt: String
+)
 
 class ReservationRepository {
 
@@ -34,12 +48,8 @@ class ReservationRepository {
     suspend fun confirmReservation(reservationId: String): Result<Unit> {
         return try {
             val now = getCurrentIsoTimestamp()
-            SupabaseConfig.client.from("reservations").update(
-                mapOf(
-                    "status" to "CONFIRMED",
-                    "confirmed_at" to now
-                )
-            ) {
+            val update = ReservationConfirmUpdate(confirmedAt = now)
+            SupabaseConfig.client.from("reservations").update(update) {
                 filter {
                     eq("id", reservationId)
                 }
@@ -53,12 +63,8 @@ class ReservationRepository {
     suspend fun cancelReservation(reservationId: String): Result<Unit> {
         return try {
             val now = getCurrentIsoTimestamp()
-            SupabaseConfig.client.from("reservations").update(
-                mapOf(
-                    "status" to "CANCELLED",
-                    "canceled_at" to now
-                )
-            ) {
+            val update = ReservationCancelUpdate(canceledAt = now)
+            SupabaseConfig.client.from("reservations").update(update) {
                 filter {
                     eq("id", reservationId)
                 }
